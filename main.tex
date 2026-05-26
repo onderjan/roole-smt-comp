@@ -1,0 +1,102 @@
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+% The preceding line is only needed to identify funding in the first footnote. If that is unneeded, please comment it out.
+%Template version as of 6/27/2024
+
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+\begin{document}
+
+\title{Roole at the SMT-COMP 2026}
+
+\author{\IEEEauthorblockN{Jan Onderka}
+  \IEEEauthorblockA{%
+    \textit{University of Freiburg}\\
+    Freiburg, Germany \\
+  onderka@cs.uni-freiburg.de}
+  \and
+  \IEEEauthorblockN{Armin Biere}
+  \IEEEauthorblockA{%
+    \textit{University of Freiburg}\\
+    Freiburg, Germany \\
+  biere@cs.uni-freiburg.de}
+}
+
+\maketitle
+
+\begin{abstract}
+  We present Roole, a Satisfiability Modulo Theories (SMT)
+  solver for the theory of quantifier-free bitvectors,
+  as submitted to the SMT-COMP 2026.
+\end{abstract}
+
+\section{Introduction}
+
+\textbf{Roole} \cite{roole} is a new SMT solver for the theory of quantifier-free bitvectors
+based on simplified Input-based Three-Valued Abstraction Refinement \cite{onderka2026}
+combined with DPLL-style search with learning and backjumping.
+\textbf{Roole} computes bitvector operations in three-valued bitvector abstraction \cite{onderka2022},
+using no bitblasting nor any underlying SAT solvers.
+It is dual-licensed under both the MIT and Apache-2.0 licence.
+
+\textbf{Roole} is written in Rust and is designed with focus on certified solving,
+with the proof-checker \textbf{Roolean} \cite{roolean}
+written in Lean that can check that the results are sound by essentially solving once again
+with the aid of \emph{oracle certificates} from \textbf{Roole} that guide its choices for better performance,
+the soundness of \textbf{Roolean} results proven through Lean theorems.
+However, as SMT-COMP does not require results to be certified, we submit \textbf{Roole} as a standalone solver.
+
+\section{Approach}
+We based \textbf{Roole} on our previous work on Input-based Three-Valued Abstraction Refinement \cite{onderka2022},
+using the fact that SMT solving of quantifier-free formulas is similar to model-checking the property
+\textbf{EX}[$p$] (there exists a path where $p$ holds in the next state), simplifying to the following.
+
+Consider a function $f: V_1 \rightarrow V_2$. Introduce abstract values in sets $\hat{V}_1$ and $\hat{V}_2$
+related by the \textit{concretization function} $\gamma: \hat{V}_\Box \rightarrow 2^{V_\Box}$
+that determines the concrete values overapproximated by the abstract value.
+The function $\hat{f}: \hat{V}_1 \rightarrow \hat{V}_2$ soundly overapproximates $f$ exactly if
+\begin{equation}
+  \forall \hat{v} \in \hat{V}_1 \; . \; \forall v \in \gamma(\hat{v}) \; . \;
+  f(v) \in \gamma(\hat{f}(\hat{v})).
+\end{equation}
+Once sound abstract functions are implemented for basic operations,
+they can be composed while retaining soundness. Finally, considering $f$ as the
+term determining satisfaction of the formula by a given assignment $v \in V_1$,
+the result of checking satisfiability is equal to
+\begin{equation}
+  \exists v \in V_1 \; . \; f(v).
+\end{equation}
+Brute-force computation using $f$ can then be replaced by computation using its sound abstraction $\hat{f}$
+on a set of abstract assignments $\hat{A} \subseteq \hat{V}_1$
+provided that no spurious abstract values are considered
+($\forall \hat{a} \in \hat{A} \; . \; \gamma(\hat{a}) \neq \emptyset$)
+and all concrete values are considered
+($\left(\bigcup_{\hat{a} \in \hat{A}} \gamma(\hat{a})\right) = V_1$).
+
+\section{Implementation}
+
+The efficiacy of the approach depends on balancing the computation speed of abstract operations
+and the number of abstract assignments needed to consider.
+
+Currently, we use the three-valued bitvector domain
+with fast computation of arithmetic operations \cite{onderka2022}.
+To search through the space of the abstract assignments for those where satisfiability
+or unsatisfiability of all overapproximated concrete assignments is shown,
+we use a search algorithm in the style of a Davis-Putnam-Logemann-Loveland (DPLL)
+procedure with additional basic machinery for backjumping and learning of abstract assignments
+found to be unsatisfiable, inspired by Conflict-Driven Clause Learning (CDCL).
+
+We note that the current implementation is a first stepping stone, without the use of commonly used
+techniques such as preprocessing or sophisticated CDCL techniques, more powerful domains,
+or any fine-tuning.
+
+\bibliographystyle{IEEEtran}
+\bibliography{main}
+
+\end{document}
